@@ -6,137 +6,717 @@
 <title>蓝色守护者 | 海洋保护公益计划</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  theme: {
-    extend: {
-      fontFamily: { geist: ['Geist', 'sans-serif'] },
-      colors: {
-        ocean: {
-          light: '#67C1E8',
-          mid: '#247BA0',
-          deep: '#07253B',
-          darker: '#041724'
-        }
-      }
-    }
-  }
-}
-</script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
+/* =============================================================================
+ * MODULE: Design Tokens / 设计令牌
+ * SCOPE: Global / 全局作用域
+ * DESC: 单一数据源集中管理全站视觉、动效参数；便于主题迭代与设计一致性校验
+ *       Single‑source‑of‑truth for visual & motion specs; simplifies theme iteration & consistency check
+ * NOTE: 禁止在业务样式内硬编码色值、模糊、缓动；修改此处将全局生效
+ *       No hard‑coded color/blur/easing in component styles; changes apply site‑wide
+ * WARN: backdrop‑filter 依赖浏览器硬件加速，低版本/移动端存在渲染差异
+ *       backdrop‑filter relies on HW‑acceleration; rendering variance on older/mobile browsers
+ * ============================================================================= */
+:root {
+  /* Color Palette · 色彩系统 (Deep‑Ocean / 深海基调) */
+  --color-bg-deep: #030B14;
+  --color-bg-mid: #071A2B;
+  --color-text-main: #F2F7FA;
+  --color-text-sub: #8DA6B8;
+  --color-accent: #4A9EBF;
+  --color-accent-glow: rgba(74, 158, 191, 0.25);
+
+  /* Liquid‑Glass Optical Params · 液态玻璃光学参数
+   * SPEC: 采用基于物理的近似参数；参数调整需同步校验卡片、导航、按钮视觉平衡
+   *       Physically‑inspired approximation; validate card/nav/button balance when tuning
+   */
+  --glass-blur: 24px;
+  --glass-saturate: 160%;
+  --glass-brightness: 110%;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight-top: rgba(255, 255, 255, 0.25);
+  --glass-highlight-bottom: rgba(255, 255, 255, 0.05);
+  --glass-shadow: 0 24px 48px rgba(0, 0, 0, 0.4);
+  
+  /* Motion Spec · 动效规范
+   * SPEC: Expo‑out 用于精致舒展反馈；双时长区分快速交互 / 慢速过渡
+   *       Expo‑out for refined easing; two durations for snappy feedback / slow flourish
+   */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-slow: 0.8s;
+  --duration-normal: 0.4s;
+}
+
+/* =============================================================================
+ * MODULE: Base Reset & Typography / 基础重置与排版
+ * SCOPE: Global / 全局
+ * DESC: 标准化盒模型、滚动行为、字体栈与抗锯齿渲染；约束横向溢出
+ *       Normalize box‑model, scroll‑behavior, font‑stack & anti‑aliasing; constrain horizontal overflow
+ * NOTE: font‑stack 顺序优先 Inter；系统回退链覆盖主流桌面、移动平台
+ *       Font‑stack prioritizes Inter; system fallbacks cover major desktop & mobile agents
+ * ============================================================================= */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
 body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background-color: var(--color-bg-deep);
+  color: var(--color-text-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #041724;
+  line-height: 1.6;
+  overflow-x: hidden;
 }
-@keyframes fadeSlideUp {
-  from { opacity:0; transform:translateY(26px); }
-  to   { opacity:1; transform:translateY(0); }
+
+/* =============================================================================
+ * MODULE: Background Layer / 背景图层
+ * SCOPE: Layout / 布局底层
+ * DESC: 固定定位径向渐变；独立于文档流作为底层；不承载任何交互
+ *       Fixed‑position radial gradient; out‑of‑flow background layer; no interactive content
+ * WARN: z-index=-1；不要在此层放置可点击元素
+ *       z-index=-1; do not place interactive elements on this layer
+ * ============================================================================= */
+.bg-gradient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(circle at 50% 0%, var(--color-bg-mid) 0%, var(--color-bg-deep) 70%);
 }
-.anim-200 { animation: fadeSlideUp 0.85s ease 0.2s both; }
-.anim-400 { animation: fadeSlideUp 0.85s ease 0.4s both; }
-.anim-600 { animation: fadeSlideUp 0.85s ease 0.6s both; }
-.anim-800 { animation: fadeSlideUp 0.85s ease 0.8s both; }
-.menu-transition { transition: all 500ms cubic-bezier(0.16,1,0.3,1); }
-.icon-transition { transition: all 300ms ease; }
-.ocean-mask {
-  position:absolute; inset:0;
-  background: radial-gradient(ellipse at top, rgba(36,123,160,0.22) 0%, rgba(4,23,36,0.78) 100%);
+
+/* =============================================================================
+ * MODULE: Liquid‑Glass Base / 液态玻璃基础组件
+ * SCOPE: Reusable / 可复用 (Nav, Stat‑Card, Solution‑Card, CTA‑Block)
+ * DESC: 通用玻璃拟态基底；多层内阴影模拟曲面体积；双伪元素实现扫掠高光 + 底部环境反光
+ *       Reusable glass base; multi‑inset highlights for curved volume; dual pseudo‑elements for sweep + bottom reflection
+ * NOTE: overflow:hidden 用于裁剪伪元素；如需子元素溢出请派生新变体
+ *       overflow:hidden clips pseudo‑elements; derive variant if child overflow is required
+ * SPEC: hover 高光旋转偏移模拟液态流动感；缓动与全局动效令牌保持一致
+ *       Hover highlight rotation‑offset simulates liquid drift; easing matches global motion tokens
+ * ============================================================================= */
+.liquid-glass {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate)) brightness(var(--glass-brightness));
+  border: 1px solid var(--glass-border);
+  box-shadow: 
+    var(--glass-shadow),
+    inset 0 1px 0 var(--glass-highlight-top),
+    inset 0 -1px 0 var(--glass-highlight-bottom);
+  border-radius: 16px;
+  transition: transform var(--duration-normal) var(--ease-out-expo), 
+              box-shadow var(--duration-normal) var(--ease-out-expo);
 }
+
+/* Sweep Highlight · 曲面扫掠高光 (::before) */
+.liquid-glass::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -20%; right: -20%; height: 50%;
+  background: linear-gradient(145deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.02) 60%, transparent 100%);
+  pointer-events: none;
+  transform: rotate(-5deg);
+  transition: transform var(--duration-slow) var(--ease-out-expo);
+}
+
+/* Bottom Environment Reflection · 底部环境反光 (::after) */
+.liquid-glass::after {
+  content: "";
+  position: absolute;
+  bottom: -10%; left: 10%; right: 10%; height: 30%;
+  background: radial-gradient(ellipse at bottom, var(--color-accent-glow), transparent 70%);
+  opacity: 0.5;
+  pointer-events: none;
+  filter: blur(12px);
+}
+
+/* Hover State · 悬浮交互态 */
+.liquid-glass:hover {
+  transform: translateY(-4px);
+  box-shadow: 
+    0 32px 64px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.1);
+}
+.liquid-glass:hover::before {
+  transform: rotate(-3deg) translateY(4px);
+}
+
+/* =============================================================================
+ * MODULE: Button System / 按钮组件系统
+ * SCOPE: Reusable / 可复用
+ * DESC: 胶囊形通用基底；区分主/次要语义；高光扫掠动画；体积感内阴影
+ *       Pill‑shaped base; primary/secondary semantic variants; sweep‑highlight animation; volume‑aware inset shadows
+ * NOTE: 语义上优先使用 <a> / <button>；避免裸 div 点击（无障碍缺陷风险）
+ *       Prefer <a> / <button> semantically; avoid raw div click handlers (a11y risk)
+ * TODO: 后续可补充 focus‑visible 键盘焦点样式
+ *       May add focus‑visible keyboard focus styles in later iteration
+ * ============================================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 28px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  border-radius: 100px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--duration-normal) var(--ease-out-expo);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Primary Action · 主行动按钮 (高权重、带光晕) */
+.btn-primary {
+  color: var(--color-bg-deep);
+  background: linear-gradient(135deg, rgba(110, 185, 215, 0.9), rgba(50, 130, 170, 0.8));
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 
+    0 0 24px var(--color-accent-glow),
+    inset 0 2px 2px rgba(255, 255, 255, 0.5),
+    inset 0 -2px 2px rgba(0, 0, 0, 0.1);
+}
+.btn-primary::before {
+  content: "";
+  position: absolute;
+  top: 0; left: -100%; width: 100%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  transition: left 0.6s var(--ease-out-expo);
+}
+.btn-primary:hover::before { left: 100%; }
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 0 36px rgba(110, 185, 215, 0.4),
+    inset 0 2px 2px rgba(255, 255, 255, 0.6),
+    inset 0 -2px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Secondary Action · 次要行动按钮 (低权重、轻玻璃基底) */
+.btn-secondary {
+  color: var(--color-text-main);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+/* =============================================================================
+ * MODULE: Layout Primitives / 布局基元
+ * SCOPE: Layout / 布局
+ * DESC: 约束容器、区块、响应式断点；clamp + media‑query 混合控制
+ *       Constrained container, section & breakpoints; hybrid clamp + media‑query control
+ * NOTE: 容器边距随断点递增；始终保留水平安全边距防止内容贴边
+ *       Container padding increases at breakpoints; maintains horizontal safe‑margin
+ * ============================================================================= */
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+@media (min-width: 768px) { .container { padding: 0 48px; } }
+@media (min-width: 1024px) { .container { padding: 0 64px; } }
+
+.section {
+  padding: 120px 0;
+  position: relative;
+}
+.section-header {
+  margin-bottom: 64px;
+  max-width: 800px;
+}
+.section-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: 16px;
+  display: block;
+}
+.section-title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 400;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  margin-bottom: 20px;
+}
+.section-desc {
+  font-size: 1.05rem;
+  color: var(--color-text-sub);
+  max-width: 600px;
+}
+
+/* =============================================================================
+ * MODULE: Hero Section / 首屏区块
+ * SCOPE: Page‑Specific / 页面专属
+ * DESC: 最小视口高度垂直分布；大屏双列网格；编辑风格大标题排版
+ *       Min‑viewport vertical layout; desktop‑only two‑col grid; editorial‑style headline
+ * WARN: 双列网格仅在 >=1024px 启用；移动端自动回退单列
+ *       Two‑col grid active only >=1024px; mobile falls back to single‑column
+ * ============================================================================= */
+.hero {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding-top: 120px;
+  padding-bottom: 60px;
+  position: relative;
+}
+.hero-main {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 40px;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+@media (min-width: 1024px) {
+  .hero-main { grid-template-columns: 1.2fr 0.8fr; align-items: end; }
+}
+.hero-title {
+  font-size: clamp(2.8rem, 6vw, 5.5rem);
+  font-weight: 300;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+.hero-title span {
+  display: block;
+  color: var(--color-accent);
+  font-weight: 400;
+}
+.hero-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  align-items: flex-end;
+  justify-content: space-between;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 32px;
+  margin-top: 60px;
+}
+.hero-desc {
+  font-size: 1rem;
+  color: var(--color-text-sub);
+  max-width: 480px;
+  line-height: 1.7;
+}
+.hero-meta {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.3);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+/* =============================================================================
+ * MODULE: Navigation Bar / 导航栏
+ * SCOPE: Page‑Specific / 页面专属
+ * DESC: 居中悬浮胶囊导航；继承 liquid‑glass；滚动触发背景与边距切换
+ *       Centered floating pill‑nav; inherits liquid‑glass; scroll‑triggered bg/padding toggle
+ * NOTE: fixed + translateX(-50%) 实现精确居中；max‑width 限制横向扩张
+ *       Exact centering via fixed + translateX(-50%); max‑width caps horizontal spread
+ * ============================================================================= */
+.nav {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 48px);
+  max-width: 1280px;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 32px;
+  border-radius: 100px;
+  transition: all var(--duration-normal) var(--ease-out-expo);
+}
+.nav.scrolled {
+  background: rgba(3, 11, 20, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-color: rgba(255, 255, 255, 0.06);
+  padding: 12px 32px;
+}
+.nav-logo {
+  font-size: 1.1rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.nav-links {
+  display: none;
+  gap: 32px;
+}
+@media (min-width: 768px) {
+  .nav-links { display: flex; }
+}
+.nav-links a {
+  color: var(--color-text-sub);
+  text-decoration: none;
+  font-size: 0.9rem;
+  transition: color 0.3s;
+}
+.nav-links a:hover { color: var(--color-text-main); }
+
+/* =============================================================================
+ * MODULE: Stats Grid / 数据统计网格
+ * SCOPE: Page‑Specific / 页面专属
+ * DESC: 响应式多列网格；统计卡片复用 liquid‑glass；固定最小高度保证视觉对齐
+ *       Responsive multi‑col grid; stat‑cards reuse liquid‑glass; min‑height for visual alignment
+ * ============================================================================= */
+.grid-stats {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+@media (min-width: 640px) { .grid-stats { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .grid-stats { grid-template-columns: repeat(4, 1fr); } }
+
+.stat-card {
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 200px;
+}
+.stat-number {
+  font-size: 2.5rem;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  margin-bottom: 8px;
+}
+.stat-label {
+  font-size: 0.9rem;
+  color: var(--color-text-sub);
+  line-height: 1.5;
+}
+
+/* =============================================================================
+ * MODULE: Solutions Grid / 方案非对称网格
+ * SCOPE: Page‑Specific / 页面专属
+ * DESC: 双列基准网格；solution‑wide 跨两列变体；卡片复用液态玻璃基类
+ *       Two‑col baseline grid; solution‑wide span‑2 variant; cards reuse liquid‑glass
+ * NOTE: 跨列样式仅 >=768px 生效；移动端自动回退单列布局
+ *       Span‑2 only active >=768px; mobile auto‑falls back to single‑column
+ * ============================================================================= */
+.grid-solutions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+@media (min-width: 768px) {
+  .grid-solutions { grid-template-columns: repeat(2, 1fr); }
+  .solution-wide { grid-column: span 2; }
+}
+.solution-card {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.solution-card h3 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.solution-card p {
+  color: var(--color-text-sub);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+/* =============================================================================
+ * MODULE: CTA Block / 行动号召区块
+ * SCOPE: Page‑Specific / 页面专属
+ * DESC: 居中约束最大宽度；液态玻璃容器；按钮组自动换行适配窄屏
+ *       Centered max‑width constraint; liquid‑glass wrapper; auto‑wrap button group for narrow viewports
+ * ============================================================================= */
+.cta-block {
+  text-align: center;
+  padding: 80px 24px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+.cta-title {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 300;
+  line-height: 1.2;
+  margin-bottom: 24px;
+}
+.cta-desc {
+  color: var(--color-text-sub);
+  font-size: 1.05rem;
+  margin-bottom: 40px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.cta-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: center;
+}
+
+/* =============================================================================
+ * MODULE: Footer / 页脚
+ * SCOPE: Page‑Specific / 页面专属
+ * DESC: 顶部分隔边框；链接均匀横向分布；低对比度文本建立次要层级
+ *       Top border divider; evenly‑spaced horizontal links; low‑contrast secondary text layer
+ * ============================================================================= */
+.footer {
+  padding: 48px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  text-align: center;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+.footer-links {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+  margin-bottom: 16px;
+}
+.footer-links a {
+  color: rgba(255, 255, 255, 0.4);
+  text-decoration: none;
+  transition: color 0.3s;
+}
+.footer-links a:hover { color: var(--color-text-main); }
+
+/* =============================================================================
+ * MODULE: Scroll Reveal Utility / 滚动渐显工具类
+ * SCOPE: Utility / 工具类
+ * DESC: 透明度 + Y轴位移入场；缓动/时长与全局动效令牌对齐；由JS注入.active
+ *       Opacity + Y‑translate entrance; easing/duration aligned with motion tokens; .active injected by JS
+ * NOTE: 采用一次性观察模式；触发后取消观察释放内存
+ *       One‑shot observation pattern; unobserve after trigger for memory efficiency
+ * ============================================================================= */
 .fade-in {
-  opacity:0; transform:translateY(30px);
-  transition:0.8s cubic-bezier(0.16,1,0.3,1);
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity var(--duration-slow) var(--ease-out-expo),
+              transform var(--duration-slow) var(--ease-out-expo);
 }
-.fade-in.active { opacity:1; transform:translateY(0); }
-.lang-btn.active { background-color:#67C1E8; color:#07253B; }
-.lang-btn:not(.active):hover { background-color:rgba(255,255,255,0.12); }
-html { scroll-behavior: smooth; }
+.fade-in.active {
+  opacity: 1;
+  transform: translateY(0);
+}
 </style>
 </head>
-<body class="text-white font-geist">
+<body>
 
-<section id="home" class="relative min-h-screen w-full overflow-hidden">
-  <video
-    autoplay muted loop playsInline
-    class="absolute inset-0 w-full h-full object-cover"
-    style="object-position:center 60%"
-    src="https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260622_204221_5339e40b-e73d-4ab0-9c65-79c18c66fd50.mp4"
-  ></video>
-  <div class="ocean-mask"></div>
+<!-- ==============================================
+     COMPONENT: Background Gradient · 背景渐变层
+     ROLE: Fixed bottom‑layer; no interaction
+     ============================================== -->
+<div class="bg-gradient"></div>
 
-  <nav class="relative z-30 flex items-center justify-between px-6 py-5 md:px-12 lg:px-16">
-    <div class="flex items-center gap-8">
-      <span class="text-lg font-semibold tracking-tight text-white sm:text-xl" data-zh="蓝色守护者" data-en="Blue Guardian">蓝色守护者</span>
-      <div class="hidden md:flex gap-6">
-        <a href="#home" data-zh="首页" data-en="Home" class="nav-link text-sm text-white/75 hover:text-ocean-light transition-colors">首页</a>
-        <a href="#problem" data-zh="海洋现状" data-en="The Problem" class="nav-link text-sm text-white/75 hover:text-ocean-light transition-colors">海洋现状</a>
-        <a href="#solution" data-zh="保护方案" data-en="Solutions" class="nav-link text-sm text-white/75 hover:text-ocean-light transition-colors">保护方案</a>
-        <a href="#action" data-zh="立即参与" data-en="Take Action" class="nav-link text-sm text-white/75 hover:text-ocean-light transition-colors">立即参与</a>
-      </div>
-    </div>
-    <div class="hidden md:flex items-center gap-3">
-      <div class="flex rounded-lg overflow-hidden border border-white/20">
-        <button class="lang-btn active px-3 py-1.5 text-xs transition-colors" data-lang="zh">中文</button>
-        <button class="lang-btn px-3 py-1.5 text-xs transition-colors" data-lang="en">EN</button>
-      </div>
-      <a href="#action" data-zh="立即行动" data-en="Take Action" class="cta-desktop rounded-lg bg-ocean-light px-5 py-2 text-sm font-medium text-ocean-deep hover:scale-105 transition-transform">立即行动</a>
-    </div>
-    <button id="menuBtn" class="md:hidden relative z-50 w-10 h-10 flex items-center justify-center active:scale-90">
-      <svg id="menuIcon" class="icon-transition absolute w-6 h-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line>
-      </svg>
-      <svg id="closeIcon" class="icon-transition absolute w-6 h-6 text-white opacity-0 scale-75 -rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>
-      </svg>
-    </button>
-  </nav>
+<!-- ==============================================
+     COMPONENT: Navbar · 导航栏
+     BIND: #navbar → JS scroll event listener
+     INHERITS: .liquid‑glass
+     ============================================== -->
+<nav class="nav liquid-glass" id="navbar">
+  <div class="nav-logo">蓝色守护者</div>
+  <div class="nav-links">
+    <a href="#problem">海洋现状</a>
+    <a href="#solution">保护举措</a>
+    <a href="#action">参与行动</a>
+  </div>
+  <a href="#action" class="btn btn-primary" style="padding: 8px 20px; font-size: 0.85rem;">采取行动</a>
+</nav>
 
-  <div id="mobileMenu" class="menu-transition absolute inset-x-0 top-0 z-20 bg-ocean-darker/96 backdrop-blur-xl h-0 opacity-0 pointer-events-none overflow-hidden">
-    <div class="flex h-full flex-col justify-center px-8">
-      <div id="menuInner" class="menu-transition delay-100 opacity-0 translate-y-8">
-        <a href="#home" class="mobile-link block text-3xl font-medium text-white/85 hover:text-ocean-light mb-5" data-zh="首页" data-en="Home">首页</a>
-        <a href="#problem" class="mobile-link block text-3xl font-medium text-white/85 hover:text-ocean-light mb-5" data-zh="海洋现状" data-en="The Problem">海洋现状</a>
-        <a href="#solution" class="mobile-link block text-3xl font-medium text-white/85 hover:text-ocean-light mb-5" data-zh="保护方案" data-en="Solutions">保护方案</a>
-        <a href="#action" class="mobile-link block text-3xl font-medium text-white/85 hover:text-ocean-light mb-5" data-zh="立即参与" data-en="Take Action">立即参与</a>
-        <div class="flex gap-3 my-6">
-          <button class="lang-btn active px-4 py-2 rounded-lg border border-white/20 text-sm transition-colors" data-lang="zh">中文</button>
-          <button class="lang-btn px-4 py-2 rounded-lg border border-white/20 text-sm transition-colors" data-lang="en">EN</button>
-        </div>
-        <a href="#action" class="mobile-link mt-2 inline-block rounded-full bg-ocean-light px-8 py-3.5 text-base font-medium text-ocean-deep hover:scale-105 transition-transform" data-zh="立即行动" data-en="Take Action">立即行动</a>
-      </div>
+<!-- ==============================================
+     SECTION: Hero · 首屏区域
+     MARKER: .fade‑in → scroll‑reveal hook / 滚动渐显标记
+     ============================================== -->
+<section class="hero container">
+  <div class="hero-main">
+    <h1 class="hero-title fade-in">
+      保护海洋，<br>
+      <span>不是选择，而是责任。</span>
+    </h1>
+    <div class="hero-desc fade-in">
+      <p>每年约800万吨塑料流入海洋，相当于每分钟倾倒一整辆垃圾车。海洋孕育了地球上约80%的生命，而它正在承受不可逆的损害。</p>
     </div>
   </div>
-
-  <div class="relative z-10 h-[calc(100vh-80px)] flex flex-col justify-between px-6 pt-12 pb-10 sm:pt-16 sm:pb-12 md:px-12 md:pt-20 md:pb-16 lg:px-16">
-    <div class="max-w-3xl">
-      <h1 class="anim-400 text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-medium leading-[1.1] tracking-tight text-white" data-zh="每一滴海水，都值得被温柔以待" data-en="Every drop of seawater deserves our gentle care">每一滴海水，都值得被温柔以待</h1>
-    </div>
-    <div>
-      <p class="anim-600 text-sm sm:text-base md:text-lg leading-relaxed text-white/65 max-w-sm sm:max-w-lg mb-5 sm:mb-6" data-zh="每年有800万吨塑料流入海洋，相当于每分钟倾倒一整辆垃圾车。加入我们，成为海洋的守护者。" data-en="Every year, 8 million tons of plastic enter the ocean, equivalent to dumping a full garbage truck every minute. Join us and become an ocean guardian.">每年有800万吨塑料流入海洋，相当于每分钟倾倒一整辆垃圾车。加入我们，成为海洋的守护者。</p>
-      <div class="anim-800 flex flex-wrap gap-3">
-        <a href="#action" class="rounded-lg bg-ocean-light px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-medium text-ocean-deep hover:scale-105 transition-transform" data-zh="立即行动" data-en="Take Action">立即行动</a>
-        <a href="#problem" class="rounded-lg border border-ocean-light/50 px-5 py-2.5 sm:px-6 sm:py-3 text-sm font-medium text-ocean-light hover:bg-ocean-light/10 transition-colors" data-zh="了解更多" data-en="Learn More">了解更多</a>
-      </div>
+  
+  <div class="hero-bottom fade-in">
+    <div class="hero-meta">联合国环境规划署 / IUCN / FAO 公开数据</div>
+    <div style="display: flex; gap: 16px;">
+      <a href="#action" class="btn btn-primary">立即行动</a>
+      <a href="#problem" class="btn btn-secondary">查阅资料</a>
     </div>
   </div>
 </section>
 
-<section id="problem" class="relative bg-ocean-darker py-20 md:py-28 px-6 md:px-12 lg:px-16">
-  <div class="max-w-5xl mx-auto">
-    <div class="fade-in mb-12">
-      <h2 class="text-2xl md:text-3xl font-semibold text-ocean-light mb-4" data-zh="海洋正在呼救，你听见了吗？" data-en="The ocean is calling — can you hear it?">海洋正在呼救，你听见了吗？</h2>
-      <p class="text-white/70 leading-relaxed" data-zh="这不是危言耸听，这是正在发生的现实。海洋孕育了地球上80%的生命，而它，正在窒息。" data-en="This is not an exaggeration; it is the reality unfolding right now. The ocean nurtures 80% of life on Earth, and it is struggling.">这不是危言耸听，这是正在发生的现实。海洋孕育了地球上80%的生命，而它，正在窒息。</p>
+<!-- ==============================================
+     SECTION: Problem · 海洋危机现状
+     CHILDREN: .stat‑card (liquid‑glass)
+     ============================================== -->
+<section id="problem" class="section container">
+  <div class="section-header fade-in">
+    <span class="section-label">The Problem</span>
+    <h2 class="section-title">海洋危机正在加剧</h2>
+    <p class="section-desc">这不是危言耸听，而是正在发生的现实。以下为已被广泛记录的关键指标。</p>
+  </div>
+  
+  <div class="grid-stats">
+    <div class="stat-card liquid-glass fade-in">
+      <div class="stat-number">800万吨</div>
+      <div class="stat-label">塑料垃圾每年进入海洋</div>
     </div>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-      <div class="fade-in bg-ocean-deep/40 rounded-xl p-6 border border-ocean-mid/20">
-        <div class="text-2xl mb-2">🌊</div>
-        <h3 class="text-lg font-medium text-white mb-1" data-zh="800万吨" data-en="8 million tons">800万吨</h3>
-        <p class="text-white/60 text-sm" data-zh="塑料垃圾每年涌入海洋" data-en="Plastic enters the ocean each year">塑料垃圾每年涌入海洋</p>
-      </div>
-      <div class="fade-in bg-ocean-deep/40 rounded-xl p-6 border border-ocean-mid/20">
-        <div class="text-2xl mb-2">🐢</div>
-        <h3 class="text-lg font-medium text-white mb-1" data-zh="10万+" data-en="100,000+">10万+</h3>
-        <p class="text-white/60 text-sm" data-zh="海洋生物因塑料污染死亡" data-en="Marine lives affected by plastic pollution">
+    <div class="stat-card liquid-glass fade-in">
+      <div class="stat-number">10万+</div>
+      <div class="stat-label">海洋生物因塑料污染死亡</div>
+    </div>
+    <div class="stat-card liquid-glass fade-in">
+      <div class="stat-number">90%</div>
+      <div class="stat-label">大型鱼类种群已经消失</div>
+    </div>
+    <div class="stat-card liquid-glass fade-in">
+      <div class="stat-number">2050年</div>
+      <div class="stat-label">海洋中的塑料重量可能超过鱼类</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==============================================
+     SECTION: Solution · 保护方案
+     CHILDREN: .solution‑card, .solution‑wide (span‑2 variant)
+     ============================================== -->
+<section id="solution" class="section container">
+  <div class="section-header fade-in">
+    <span class="section-label">The Solution</span>
+    <h2 class="section-title">保护海洋，从五项行动开始</h2>
+    <p class="section-desc">下述措施经相关领域研究验证具备可行性，可作为公众参与海洋保护的参考方向。</p>
+  </div>
+  
+  <div class="grid-solutions">
+    <div class="solution-card liquid-glass fade-in">
+      <h3>① 减少一次性塑料</h3>
+      <p>拒绝塑料袋、吸管与一次性餐具，从源头削减进入海洋的塑料垃圾总量。</p>
+    </div>
+    <div class="solution-card liquid-glass fade-in">
+      <h3>② 选择可持续海鲜</h3>
+      <p>认准MSC/ASC认证标识，避免选购濒危海洋物种；以消费端选择引导可持续渔业发展。</p>
+    </div>
+    <div class="solution-card liquid-glass fade-in">
+      <h3>③ 参与净滩行动</h3>
+      <p>有序参与海滩清理活动并做好垃圾分类记录；微小行动能够直接降低海洋生物误食风险。</p>
+    </div>
+    <div class="solution-card liquid-glass fade-in">
+      <h3>④ 降低个人碳足迹</h3>
+      <p>海洋承担全球约30%二氧化碳吸收任务；低碳出行、节约能源有助于缓解海洋酸化进程。</p>
+    </div>
+    <div class="solution-card liquid-glass solution-wide fade-in">
+      <h3>⑤ 知识传播与专业支持</h3>
+      <p>传播严谨可靠的海洋保护科普内容、支持合规专业保护组织；理性发声能够持续推动正向改变。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==============================================
+     SECTION: CTA · 行动号召
+     WRAPPER: .cta‑block (liquid‑glass)
+     ============================================== -->
+<section id="action" class="section container">
+  <div class="cta-block liquid-glass fade-in">
+    <span class="section-label">Get Involved</span>
+    <h2 class="cta-title">行动是唯一有效的回应</h2>
+    <p class="cta-desc">
+      加入「蓝色守护者」计划，你将获得专属行动指南、净滩活动优先报名权、参与证书与定期进展报告。
+    </p>
+    <div class="cta-buttons">
+      <a href="#" class="btn btn-primary">免费加入</a>
+      <a href="#" class="btn btn-secondary">每月捐赠</a>
+    </div>
+  </div>
+</section>
+
+<!-- ==============================================
+     SECTION: Closing · 结语区块
+     NOTE: No liquid‑glass wrapper; text‑only scroll‑reveal
+     ============================================== -->
+<section class="section container" style="padding-top: 0;">
+  <div class="cta-block fade-in" style="padding-top: 0;">
+    <h2 class="cta-title">海洋不需要我们，<br>是我们需要海洋。</h2>
+    <p class="cta-desc">
+      它提供氧气、食物、气候调节和无数生命赖以生存的环境。现在，必须由我们采取行动。
+    </p>
+    <a href="#" class="btn btn-primary">成为守护者</a>
+  </div>
+</section>
+
+<!-- ==============================================
+     FOOTER: 页脚组件
+     ============================================== -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer-links">
+      <a href="#">关于我们</a>
+      <a href="#">隐私政策</a>
+      <a href="#">联系我们</a>
+    </div>
+    <p>© 2026 蓝色守护者 · 保护海洋，立即行动</p>
+  </div>
+</footer>
+
+<script>
+/* =============================================================================
+ * SCRIPT: Navbar Scroll Behaviour / 导航栏滚动逻辑
+ * DESC: 滚动阈值 >50px 添加 .scrolled；更新背景透明度与内边距
+ *       Adds .scrolled class when scrollY > 50; updates background & padding
+ * BIND: navbar ← document.getElementById('navbar')
+ * ============================================================================= */
+const navbar = document.getElementById('navbar');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 50) {
+    navbar.classList.add('scrolled');
+  } else {
+    navbar.classList.remove('scrolled');
+  }
+});
+
+/* =============================================================================
+ * SCRIPT: Scroll‑Reveal Intersection‑Observer / 滚动渐显观察器
+ * DESC: 一次性观察策略：元素进入视口 → 添加.active → 取消观察释放资源
+ *       One‑shot observation: enter viewport → inject .active → unobserve for GC
+ * CONFIG: threshold / rootMargin 控制触发时机；与CSS动效时序对齐
+ *       threshold & rootMargin tune trigger timing; aligned with CSS motion timeline
+ * WARN: 如需重复入场动画，请移除 unobserve（会增加运行时开销）
+ *       Remove unobserve only if re‑entrance animation is required (higher runtime cost)
+ * ============================================================================= */
+const observerOptions = {
+  threshold: 0.1,
+  rootMargin: '0px 0px -50px 0px'
+};
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.classList.add('active');
+      observer.unobserve(entry.target);
+    }
+  });
+}, observerOptions);
+
+document.querySelectorAll('.fade-in').forEach(el => {
+  observer.observe(el);
+});
+</script>
+
+</body>
+</html>
